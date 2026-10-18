@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test & build
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Toolchain
+        run: |
+          swiftc --version
+          xcrun --show-sdk-version
+
+      - name: No signing material in the repo
+        run: |
+          if git ls-files | grep -E '(^|/)signing/|\.(p12|pem|keychain|keychain-db)$'; then
+            echo "::error::Code-signing files must never be committed (see .gitignore)."
+            exit 1
+          fi
+
+      - name: Lint Info.plist
+        run: plutil -lint Info.plist
+
+      - name: Unit tests
+        run: ./test.sh
+
+      - name: Build universal app (ad-hoc signed)
+        run: ./build.sh --ci
+
+      - name: Verify app bundle
+        run: |
+          APP="build/Webcam Crop.app"
+          lipo "$APP/Contents/MacOS/WebcamCrop" -verify_arch arm64 x86_64
+          plutil -lint "$APP/Contents/Info.plist"
+          test -s "$APP/Contents/Resources/AppIcon.icns"
+          codesign --verify --strict --verbose=2 "$APP"
+
+      - name: Upload app
+        uses: actions/upload-artifact@v7
+        with:
+          name: Webcam-Crop-${{ github.sha }}
+          path: build/Webcam-Crop.zip
+          retention-days: 7

@@ -1,0 +1,17 @@
+# build output
+build/
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# local code-signing identity: private key + keychain password. NEVER commit.
+signing/
+*.p12
+*.pem
+*.keychain
+*.keychain-db
+
+# macOS
+.DS_Store
